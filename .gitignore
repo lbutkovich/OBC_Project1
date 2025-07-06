@@ -277,3 +277,6 @@ documents/
 
 # input (sequence files are too large)
 input/
+
+# tutorial script
+tutorial_script/
