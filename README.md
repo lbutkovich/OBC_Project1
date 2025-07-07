@@ -5,6 +5,8 @@ Project 1
 to-do: fill in
 
 # Requirements
+to-do: finalize
+
 qiime2-amplicon-2025.4
 requests
 pathlib
