@@ -10,3 +10,4 @@ to-do: finalize
 qiime2-amplicon-2025.4
 requests
 pathlib
+openpyxl
