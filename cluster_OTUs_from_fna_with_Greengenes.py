@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-cluster_OTUs_from_fna.py
+cluster_OTUs_from_fna_with_Greengenes.py --> this script currently raises errors, due to the reference Greengenes sequences being ~253 bp (with some variation) vs. the 203 bp sequences from David et al. (2014) (https://www.nature.com/articles/nature12820).
+
 Created 7/8/25
 
 This script clusters OTUs (Operational Taxonomic Units) from 16S rRNA sequences using the VSEARCH tool. This script was built for metagenomic data analysis from David et al. (2014) (https://pmc.ncbi.nlm.nih.gov/articles/PMC3957428/). This script was built using (1) the QIIME 2 "Moving Pictures" tutorial as a template (https://amplicon-docs.qiime2.org/en/latest/tutorials/moving-pictures.html) and (2) the older OTU clustering tutorial for QIIME2 (https://docs.qiime2.org/2024.10/tutorials/otu-clustering/). Use the QIIME 2 viewer to visualize .qza/.qzv file outputs (https://view.qiime2.org/).
@@ -13,7 +14,7 @@ Outputs:
 - .qzv file visualizing the metadata
 - .qza file containing clustered OTUs
 
-***For Windows users, you can run the script through the Ubuntu terminal, due to QIIME 2 (first line run once per terminal session):
+For Windows users, you can run the script through the Ubuntu terminal, due to QIIME 2 (first line run once per terminal session):
 conda activate qiime2-amplicon-2025.4
 python3 cluster_OTUs_from_fna.py
 """
@@ -82,6 +83,84 @@ def generate_feature_frequency_table(qza_input_dir, sample_id, output_dir):
     ], check=True)
     return
 
+def download_greengenes_97_reference(url, target_folder, target_fasta, target_fasta_dir, output_dir):
+    """Download the GreenGenes 97% OTU reference .fasta.
+
+    Download the target_folder (zipped) from url. Extract the contents and move the target_fasta (found at target_fasta_dir) to output_dir. Delete the other extracted files.
+    
+    Args:
+        url (str): The URL to download the reference sequences from.
+        target_folder (str): The target folder for the downloaded reference sequences.
+        target_fasta (str): The target fasta file name for the downloaded reference sequences.
+        target_fasta_dir (str): The directory (starting at target_folder) for the target fasta file.
+        output_dir (str): The directory to save the downloaded file.
+
+    Returns:
+        None
+    """
+    target_path = Path(target_folder)
+    with requests.get(url, stream=True, timeout=30) as r:
+        r.raise_for_status() # If the server is down, returns 4xx/5xx error
+        with target_path.open("wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+    # Extract the downloaded tar.gz file
+    with tarfile.open(target_path, "r:gz") as tar:
+        tar.extractall(path=output_dir)
+
+    base_folder = target_folder.split(".tar.gz")[0] # 'gg_13_8_otus'
+    path_fasta = pjoin(output_dir, target_fasta_dir, target_fasta)
+
+    # Use only path_fasta; raise an error if the file is not found
+    if os.path.exists(path_fasta):
+        extracted_fasta_path = path_fasta
+        print("✔ Found greengenes_97_otu FASTA in downloaded folder", extracted_fasta_path)
+    else:
+        raise FileNotFoundError(
+            f"Could not locate {target_fasta} after extraction (looked at {path_fasta})."
+        )
+
+    if os.path.exists(path_fasta):
+        extracted_fasta_path = path_fasta
+        print("✔ Found FASTA at path_a:", extracted_fasta_path)
+    else:
+        raise FileNotFoundError(f"Could not locate {target_fasta} after extraction.")
+
+    # Move fasta to OUTPUT_SCRIPT_FOLDER_DIR
+    shutil.move(extracted_fasta_path, pjoin(output_dir, target_fasta))
+
+    # Clean-up: remove extracted folder and archive
+    shutil.rmtree(pjoin(output_dir, base_folder), ignore_errors=True)
+    try:
+        target_path.unlink()
+    except Exception:
+        pass
+
+    print(f"Downloaded GreenGenes 97% OTU reference sequences to {pjoin(output_dir, target_fasta)}.")
+    return
+
+def trim_reference_sequences_to_V4_region(reference_qza, primer_f, primer_r):
+    """Trim the reference sequences to the V4 region using primers and feature-classifier.
+    
+    Args:
+        reference_qza (str): Path to the reference sequences QIIME 2 artifact.
+        primer_f (str): Forward primer sequence for the V4 region.
+        primer_r (str): Reverse primer sequence for the V4 region.
+        
+    Returns:
+        None
+    """
+    subprocess.run([
+        "qiime", "feature-classifier", "extract-reads",
+        "--i-sequences", reference_qza,
+        "--p-f-primer", primer_f,
+        "--p-r-primer", primer_r,
+        "--o-reads", reference_qza.split(".qza")[0] + "_trimmed_V4.qza"
+    ], check=True)
+    return
+
 def create_sequences_histogram(qza, output_image):
     """Create a histogram of sequence lengths in a QIIME 2 artifact.
 
@@ -99,14 +178,15 @@ def create_sequences_histogram(qza, output_image):
     ], check=True)
     return
 
-def cluster_otus_de_novo(feature_input_dir, sample_id, otu_output_dir,
+def cluster_otus(feature_input_dir, sample_id, reference_qza, otu_output_dir,
                  p_ident="0.97", strand="both"):
-    """Use QIIME 2's vsearch plugin to perform de novo clustering of OTUs.
+    """Use QIIME 2's vsearch plugin to perform closed-reference clustering of OTUs.
 
     Source: https://docs.qiime2.org/2024.10/tutorials/otu-clustering/
 
     Args:
         sample_id (str): Sample ID for the artifacts.
+        reference_qza (str): Path to the reference sequences QIIME 2 artifact.
         output_dir (str): Directory for the clustered artifacts.
         p_ident (str): Percent identity for clustering (default is "0.97" for 97% identity).
         strand (str): Orientation handling for matching (‘plus’, ‘minus’, or ‘both’).
@@ -117,12 +197,15 @@ def cluster_otus_de_novo(feature_input_dir, sample_id, otu_output_dir,
     feature_table_path = pjoin(feature_input_dir, f"{sample_id}_feature_table.qza")
     feature_data_path = pjoin(feature_input_dir, f"{sample_id}_feature_data.qza")
     subprocess.run([
-        "qiime", "vsearch", "cluster-features-de-novo",
+        "qiime", "vsearch", "cluster-features-closed-reference",
         "--i-table", feature_table_path,
         "--i-sequences", feature_data_path,
+        "--i-reference-sequences", reference_qza,
         "--p-perc-identity", p_ident,
+        "--p-strand", strand,
         "--o-clustered-table", pjoin(otu_output_dir, f"{sample_id}-table-cr-{p_ident}.qza"),
-        "--o-clustered-sequences", pjoin(otu_output_dir, f"{sample_id}-rep-seqs-cr-{p_ident}.qza")
+        "--o-clustered-sequences", pjoin(otu_output_dir, f"{sample_id}-rep-seqs-cr-{p_ident}.qza"),
+        "--o-unmatched-sequences", pjoin(otu_output_dir, f"{sample_id}-unmatched-cr-{p_ident}.qza")
     ], check=True)
     return
 
@@ -268,16 +351,63 @@ for index, row in sample_metadata_df.iterrows():
 
 
 """
-OTU Clustering de novo
+OTU Clustering: Download Reference GreenGenes Sequences
 """
-# Info on picking OTU clustering strategy (de novo vs. closed reference vs. open reference: https://qiime.org/tutorials/otu_picking.html)
+# From QIIME2 OTU Clustering Tutorial: https://docs.qiime2.org/2024.10/tutorials/otu-clustering/
+# Notes:
+# - OTU clustering in QIIME 2 is currently applied to a FeatureTable[Frequency] artifact and a FeatureData[Sequence] artifact. 
+# - These artifacts can come from a variety of analysis pipelines, including qiime vsearch dereplicate-sequences (illustrated above), qiime dada2 denoise-*, qiime deblur denoise-*, or one of the clustering processes illustrated below (for example, to recluster data at a lower percent identity).
+# - The sequences in the FeatureData[Sequence] artifact are clustered against one another (in de novo clustering) or a reference database (in closed-reference clustering), and then features in the FeatureTable are collapsed, resulting in new features that are clusters of the input features.
+
+# For this study:
+# - we generated the FeatureTable[Frequency] and FeatureData[Sequence] artifacts in the previous step (dereplicate-sequences)
+# - we will cluster against a reference database (GreenGenes)
+
+# Download the GreenGenes 97% OTU reference sequences file if REFERENCE_GREENGENES_97_QZA_FILENAME does not exist in OUTPUT_SCRIPT_FOLDER_DIR yet
+reference_sequences_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, FASTA_FILENAME_GREENGENES_97)
+reference_sequences_qza_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, REFERENCE_GREENGENES_97_QZA_FILENAME)
+if not os.path.exists(reference_sequences_qza_path):
+    print("Downloading GreenGenes 97% OTU reference sequences...")
+    download_greengenes_97_reference(URL_GREENGENES_97, TARGET_GREENGENES_97, FASTA_FILENAME_GREENGENES_97, DOWNLOADED_FASTA_DIR_GREENGENES_97, OUTPUT_SCRIPT_FOLDER_DIR)
+    # Import the 97% fasta to a QIIME 2 Artifact (store in OUTPUT_SCRIPT_FOLDER_DIR)
+    import_fna_as_artifact(
+        reference_sequences_path,
+        REFERENCE_GREENGENES_97_QZA_FILENAME.split(".qza")[0], 
+        OUTPUT_SCRIPT_FOLDER_DIR,
+        semantic_type="FeatureData[Sequence]"
+    )
+    print(f"Downloaded and imported GreenGenes 97% OTU reference sequences to {reference_sequences_qza_path}.")
+else:
+    print(f"GreenGenes 97% OTU reference sequences already exist at {reference_sequences_qza_path}. Skipping download.")
+
+# Trim the reference sequences to the V4 region using primers
+reference_qza_v4_filename = REFERENCE_GREENGENES_97_QZA_FILENAME.split(".qza")[0] + "_trimmed_V4.qza"
+reference_qza_v4_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, reference_qza_v4_filename)
+if not os.path.exists(reference_qza_v4_path):
+    print("Trimming Greengenes reference sequences to V4 region...")
+    trim_reference_sequences_to_V4_region(reference_sequences_qza_path, V4_PRIMER_F, V4_PRIMER_R)
+    print(f"Trimmed reference sequences saved to {reference_qza_v4_path}.")
+else:
+    print("Greengenes reference already trimmed to V4 region. Skipping trimming step.")
+
+# Print statistics for the V4 trimmed reference sequences
+# Create a histogram of sequence lengths in the reference:
+try:
+    create_sequences_histogram(reference_qza_v4_path, pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "reference_sequences_length_histogram.png"))
+except Exception as e:
+    print(f"Error creating sequences histogram: {e}")
+
+
+"""
+OTU Clustering
+"""
 # If it does not exist, create the output folder for OTU clustering results
 otu_clustering_output_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "OTU_clustering")
 if not os.path.exists(otu_clustering_output_path):
     os.makedirs(otu_clustering_output_path)
 
 # Loop over each sample ID in the metadata
-# Perform de novo clustering using the vsearch plugin in QIIME 2.
+# Perform closed-reference clustering using the vsearch plugin in QIIME 2.
 for index, row in sample_metadata_df.iterrows():
     sample_id = row[SAMPLE_ID_COL_NAME]
 
@@ -290,17 +420,14 @@ for index, row in sample_metadata_df.iterrows():
 
     # Cluster the OTUs for the sample
     try:
-        cluster_otus_de_novo(feature_table_output_path, sample_id, otu_clustering_output_path)
+        cluster_otus(
+            feature_table_output_path,
+            sample_id,
+            reference_qza_v4_path,
+            otu_clustering_output_path,
+            p_ident="0.97",
+            strand="both"          # ensure both orientations are considered
+        )
         print(f"Successfully clustered OTUs for {sample_id}.")
     except subprocess.CalledProcessError as e:
         print(f"Error clustering OTUs for {sample_id}: {e}")
-    
-
-"""
-Generate Phylogenetic Tree for OTUs
-"""
-
-"""
-Alpha and beta diversity analysis
-"""
-# Parse metadata to 
