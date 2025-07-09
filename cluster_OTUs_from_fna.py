@@ -11,7 +11,9 @@ Inputs:
 
 Outputs:
 - .qzv file visualizing the metadata
-- .qza file containing clustered OTUs
+- .qza files for sequences (from .fna) per sample
+- .qza files for feature tables and data for sequence frequencies per sample
+- .qza files containing (de novo) clustered OTUs per sample
 
 ***For Windows users, you can run the script through the Ubuntu terminal, due to QIIME 2 (first line run once per terminal session):
 conda activate qiime2-amplicon-2025.4
@@ -294,13 +296,3 @@ for index, row in sample_metadata_df.iterrows():
         print(f"Successfully clustered OTUs for {sample_id}.")
     except subprocess.CalledProcessError as e:
         print(f"Error clustering OTUs for {sample_id}: {e}")
-    
-
-"""
-Generate Phylogenetic Tree for OTUs
-"""
-
-"""
-Alpha and beta diversity analysis
-"""
-# Parse metadata to 
