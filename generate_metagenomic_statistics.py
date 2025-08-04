@@ -14,9 +14,6 @@ import os
 from os.path import join as pjoin
 import pandas as pd
 import subprocess
-import requests
-from pathlib import Path
-import tarfile
 import shutil
 
 # QIIME 2 imports:

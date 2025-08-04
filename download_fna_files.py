@@ -26,35 +26,74 @@ start = time.time()
 Functions
 """
 def get_json(url: str, auth: Optional[str] = None) -> Dict:
-    """HTTP GET → JSON (raises on HTTP errors)."""
+    """Fetches MG-RAST API JSON via HTTP GET.
+    
+    Args:
+        url (str): The URL to fetch.
+        auth (Optional[str]): Optional authentication key for the request.
+    Raises:
+        requests.HTTPError: If the HTTP request fails.
+    Returns:
+        Dict: Parsed JSON response from the API.
+    """
     hdr = {"auth": auth} if auth else {}
     r = requests.get(url, headers=hdr, timeout=90)
     r.raise_for_status()
     return r.json()
 
 def list_metagenomes(project_id: str, auth: Optional[str] = None) -> List[dict]:
-    """
-    Return [{'id': 'mgm1234.3', 'name': 'DD17'}, …] for every metagenome
-    belonging to *project_id*.
+    """Returns metagenome information [{'id': 'mgm1234.3', 'name': 'DD17'}, …] for every metagenome
+    in the project_id.
+
+    Args:
+        project_id (str): The ID of the project to list metagenomes for.
+        auth (Optional[str]): Optional authentication key for the request.
+    Returns:
+        List[dict]: A list of dictionaries containing metagenome information.
     """
     url  = f"{BASE_URL}/project/{project_id}?verbosity=full"
     info = get_json(url, auth)
-    return [{"id": m["metagenome_id"], "name": m["name"]}          # 'name' key
+    return [{"id": m["metagenome_id"], "name": m["name"]}
             for m in info["metagenomes"]]
 
 def list_files(mgm_id: str, auth: Optional[str] = None) -> List[Dict]:
-    """Catalogue of downloadable artefacts for one metagenome."""
+    """Generates a catalogue of downloadable artefacts for a metagenome.
+    
+    Args:
+        mgm_id (str): The ID of the metagenome to list files for.
+        auth (Optional[str]): Optional authentication key for the request.
+    Returns:
+        List[Dict]: A list of dictionaries containing file information."""
     return get_json(f"{BASE_URL}/download/{mgm_id}", auth)["data"]
 
 def pick_fna(files: List[Dict], wanted_id: str) -> Optional[Dict]:
-    """Return the entry that matches *wanted_id* and ends with '.fna'."""
+    """Finds the .fna file.
+    
+    Returns the entry that matches wanted_id and ends with '.fna'.
+    
+    Args:
+        files (List[Dict]): List of file dictionaries to search.
+        wanted_id (str): The file ID to match.
+    Returns:
+        Optional[Dict]: The matching file entry or None if not found.
+    """
     return next(
         (f for f in files if f["file_id"] == wanted_id and f["file_name"].endswith(".fna")),
         None
     )
 
 def stream_download(url: str, dest: Path, auth: Optional[str] = None) -> None:
-    """Stream large files in 1 MiB chunks → disk (keeps RAM low)."""
+    """Streams large files in smaller chunks to keep RAM low.
+    
+    Args:
+        url (str): The URL to download the file from.
+        dest (Path): The destination path to save the downloaded file.
+        auth (Optional[str]): Optional authentication key for the request.
+    Raises:
+        requests.HTTPError: If the HTTP request fails.
+    Returns:
+        None
+    """
     hdr = {"auth": auth} if auth else {}
     with requests.get(url, headers=hdr, stream=True, timeout=300) as r:
         r.raise_for_status()
@@ -67,20 +106,27 @@ def stream_download(url: str, dest: Path, auth: Optional[str] = None) -> None:
 """
 Values
 """
-OUTDIR = "downloads"     # local folder for saving data
-AUTH_KEY = None            # paste your 25-char web-key here (or keep None)
-STAGE = "raw"           # "raw"  → original reads (050.1)
-                        # "assembled" → contigs (299.1)
+# local folder for saving data
+OUTDIR = "downloads"
+
+# MG-RAST-specific values:
+# paste your 25-char web-key here (or keep None)
+AUTH_KEY = None
+# "raw" = original reads; "assembled" = contigs
+STAGE = "raw"
+FILE_IDS = {
+    "raw"      : "050.1",
+    "assembled": "299.1",
+}
+# Base URL for the MG-RAST API           
 BASE_URL = "https://api.mg-rast.org/1"
 
-FILE_IDS = {
-    "raw"      : "050.1",   # *.upload.fna
-    "assembled": "299.1",   # *.assembled_contigs.fna
-}
-
+# Project-specific values:
+# Project ID for the David et al. (2014) dataset
 PROJECT_ID = "mgp6248"
-# Acceptable dataset names:  DD1 … DD999  or  ID1 … ID999
-NAME_OK = re.compile(r'^(?:DD|ID)\d{1,3}$', re.I)   # case-insensitive
+# Acceptable dataset names:  DD1 … DD999  or  ID1 … ID999. Case-insensitive.
+NAME_OK = re.compile(r'^(?:DD|ID)\d{1,3}$', re.I)
+
 
 """
 Download Target .fna files from MG-RAST for Accession ID
