@@ -3,6 +3,8 @@
 generate_metagenomic_statistics.py
 Created 7/9/25
 
+This script performs metagenomic analyses using OTU clustering results and QIIME 2.
+
 
 ***For Windows users, you can run the script through the Ubuntu terminal, due to QIIME 2 (first line run once per terminal session):
 conda activate qiime2-amplicon-2025.4
@@ -346,6 +348,7 @@ RERUN_EXISTING_DATA = False
 CLASSIFIER_FILENAME = "silva-138-99-nb-classifier.qza"
 CLASSIFIER_PATH = pjoin(INPUT_FOLDER, CLASSIFIER_FILENAME)
 
+
 """
 Assign Taxonomy
 """
@@ -407,39 +410,38 @@ else:
     print(f"Phylogenetic tree already exists at: {rooted_tree_out_path}. Skipping tree building step.")
 
 
-"""
-Core Diversity Analysis
-"""
-# QIIME 2 diversity core-metrics-phylogenetic documentation: https://docs.qiime2.org/2024.10/plugins/available/diversity/core-metrics-phylogenetic/
-# Perform diversity analysis with every run
+# """
+# Core Diversity Analysis
+# """
+# # QIIME 2 diversity core-metrics-phylogenetic documentation: https://docs.qiime2.org/2024.10/plugins/available/diversity/core-metrics-phylogenetic/
+# # Perform diversity analysis with every run
 
-# Need both feature table and rooted tree for diversity analysis
-feature_table_qza_path = pjoin(CLUSTER_OTUS_OUTPUT_FOLDER_DIR, "merged-table-cr-0.97_" + RUN_DESCRIPTOR + ".qza")
-if not os.path.exists(feature_table_qza_path):
-    print(f"Error: Feature table not found at {feature_table_qza_path}")
-    print("Make sure to run the OTU clustering script first to generate the feature table.")
-else:
-    # Set up paths for core diversity analysis
-    diversity_out_dir = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "core_diversity_" + RUN_DESCRIPTOR)
+# # Need both feature table and rooted tree for diversity analysis
+# feature_table_qza_path = pjoin(CLUSTER_OTUS_OUTPUT_FOLDER_DIR, "merged-table-cr-0.97_" + RUN_DESCRIPTOR + ".qza")
+# if not os.path.exists(feature_table_qza_path):
+#     print(f"Error: Feature table not found at {feature_table_qza_path}")
+#     print("Make sure to run the OTU clustering script first to generate the feature table.")
+# else:
+#     # Set up paths for core diversity analysis
+#     diversity_out_dir = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "core_diversity_" + RUN_DESCRIPTOR)
     
-    # Determine an appropriate sampling depth
-    # A higher value gives better resolution but may exclude samples with fewer sequences
-    # A lower value includes more samples but with less resolution
-    # This would ideally be determined by looking at the feature table summary
-    sampling_depth = 1000  # Default conservative value
+#     # Determine an appropriate sampling depth
+#     # A higher value gives better resolution but may exclude samples with fewer sequences
+#     # A lower value includes more samples but with less resolution
+#     # This would ideally be determined by looking at the feature table summary
+#     sampling_depth = 1000  # Default conservative value
     
-    # Run core diversity analysis
-    run_core_diversity_analysis(
-        feature_table_qza=feature_table_qza_path,
-        rooted_tree_qza=rooted_tree_out_path,
-        metadata_path=METADATA_PATH,
-        taxonomy_qza=taxonomy_out_path,
-        output_dir=diversity_out_dir,
-        sampling_depth=sampling_depth,
-        threads=1  # Use a single thread for memory efficiency
-    )
+#     # Run core diversity analysis
+#     run_core_diversity_analysis(
+#         feature_table_qza=feature_table_qza_path,
+#         rooted_tree_qza=rooted_tree_out_path,
+#         metadata_path=METADATA_PATH,
+#         taxonomy_qza=taxonomy_out_path,
+#         output_dir=diversity_out_dir,
+#         sampling_depth=sampling_depth,
+#         threads=1  # Use a single thread for memory efficiency
+#     )
     
-
 
 # """
 # Differential-abundance & compositional stats
@@ -458,42 +460,3 @@ else:
 # Time-series Analysis
 # """
 # # Consider qiime longitudinal plugin for time-series analysis of microbiome data.
-
-# """
-# Print instructions for viewing results
-# """
-# print("\n" + "="*80)
-# print("RESULTS SUMMARY")
-# print("="*80)
-# print("Analysis completed. Here's how to view the results:")
-
-# # Add instructions for viewing the phylogenetic tree
-# print("\n1. To view the phylogenetic tree:")
-# tree_viz_path = rooted_tree_out_path.replace(".qza", ".qzv")
-# print(f"   qiime tools view {tree_viz_path}")
-
-# # Continue with other instructions
-# print("\n2. To view the taxonomy classification:")
-# print(f"   qiime tools view {taxonomy_out_path.replace('.qza', '_tabulated.qzv')}")
-# print("\n3. To view the taxonomy barplot (if generated):")
-# taxonomy_barplot_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "taxonomy_barplot_" + RUN_DESCRIPTOR + ".qzv")
-# print(f"   qiime tools view {taxonomy_barplot_path}")
-# print("\n4. To explore the diversity analysis results:")
-# diversity_out_dir = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "core_diversity_" + RUN_DESCRIPTOR)
-# print(f"   cd {diversity_out_dir}")
-# print("   qiime tools view faith_pd_significance.qzv  # Alpha diversity")
-# print("   qiime tools view weighted_unifrac_emperor.qzv  # Beta diversity PCoA plot")
-
-# print("\nAlternatively, you can use QIIME 2 View online:")
-# print("1. Go to https://view.qiime2.org")
-# print("2. Drag and drop any of these files to view them in your browser:")
-# print(f"   - {tree_viz_path}  # Phylogenetic tree visualization")
-# print(f"   - {taxonomy_out_path.replace('.qza', '_tabulated.qzv')}  # Taxonomy classification")
-# taxonomy_barplot_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "taxonomy_barplot_" + RUN_DESCRIPTOR + ".qzv")
-# print(f"   - {taxonomy_barplot_path}  # Taxonomy barplot (if generated)")
-# print("   - [Diversity analysis visualizations from the core_diversity folder]")
-# print("\nFor .qza files (like the tree data itself):")
-# print(f"1. You can open {rooted_tree_out_path} in QIIME 2 View as well")
-# print("2. Or export it to Newick format for use in other tree viewers:")
-# print(f"   qiime tools export --input-path {rooted_tree_out_path} --output-path exported_tree")
-# print("="*80)

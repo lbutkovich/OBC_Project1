@@ -3,7 +3,7 @@
 cluster_OTUs_from_fna.py
 Created 7/8/25
 
-This script clusters OTUs (Operational Taxonomic Units) from 16S rRNA sequences using the VSEARCH tool. This script was built for metagenomic data analysis from David et al. (2014) (https://pmc.ncbi.nlm.nih.gov/articles/PMC3957428/). This script was built using (1) the QIIME 2 "Moving Pictures" tutorial as a template (https://amplicon-docs.qiime2.org/en/latest/tutorials/moving-pictures.html) and (2) the older OTU clustering tutorial for QIIME2 (https://docs.qiime2.org/2024.10/tutorials/otu-clustering/). Use the QIIME 2 viewer to visualize .qza/.qzv file outputs (https://view.qiime2.org/).
+This script clusters OTUs (Operational Taxonomic Units) from 16S rRNA sequences using the VSEARCH tool. This script was built for metagenomic data analysis from David et al. (2014) (https://pmc.ncbi.nlm.nih.gov/articles/PMC3957428/). This script was built using (1) the QIIME 2 "Moving Pictures" tutorial as a template (https://amplicon-docs.qiime2.org/en/latest/tutorials/moving-pictures.html) and (2) the older OTU clustering tutorial for QIIME 2 (https://docs.qiime2.org/2024.10/tutorials/otu-clustering/). Use the QIIME 2 viewer (https://view.qiime2.org/) to visualize .qza/.qzv file outputs.
 
 Inputs:
 - .fna files downloaded from MG-RAST for 16S rRNA sequencing. Note, this script utilizes processed .fna files only, not .fastq files
@@ -45,7 +45,6 @@ def import_fna_as_artifact(fna_file, sample_id, qza_output_dir, semantic_type="S
         fna_file (str): Path to the .fna file.
         sample_id (str): Sample ID for the artifact.
         qza_output_dir (str): Directory for the QIIME 2 artifact output.
-
     Returns:
         None
     """
@@ -67,7 +66,6 @@ def generate_feature_frequency_table(qza_input_dir, sample_id, output_dir):
         qza_input_dir (str): Directory containing the input QIIME 2 artifacts.
         sample_id (str): Sample ID for the artifacts.
         output_dir (str): Directory for the output artifacts.
-
     Returns:
         None
     """
@@ -91,7 +89,6 @@ def merge_feature_table(feature_tables_dir, output_dir, run_descriptor, batch_si
         output_dir (str): Directory to save the merged feature table.
         run_descriptor (str): Descriptor for the run (e.g., "test" or "full").
         batch_size (int): Number of files to process in each batch.
-
     Returns:
         merged_feature_table_path (str): Path to the merged feature table artifact.
     """
@@ -161,7 +158,6 @@ def merge_feature_sequences(feature_sequences_dir, output_dir, run_descriptor, b
         output_dir (str): Directory to save the merged feature sequences.
         run_descriptor (str): Descriptor for the run (e.g., "test" or "full").
         batch_size (int): Number of files to process in each batch.
-
     Returns:
         merged_sequences_path (str): Path to the merged feature sequences artifact.
     """
@@ -233,7 +229,6 @@ def cluster_otus_de_novo_per_sample(feature_input_dir, sample_id, otu_output_dir
         output_dir (str): Directory for the clustered artifacts.
         p_ident (str): Percent identity for clustering (default is "0.97" for 97% identity).
         strand (str): Orientation handling for matching (‘plus’, ‘minus’, or ‘both’).
-
     Returns:
         None    
     """
@@ -259,7 +254,6 @@ def cluster_otus_de_novo_merged(merged_feature_table_path, merged_feature_sequen
         run_descriptor (str): Descriptor for the run (e.g., "test" or "full").
         p_ident (str): Percent identity for clustering (default is "0.97" for 97% identity).
         strand (str): Orientation handling for matching ('plus', 'minus', or 'both').
-
     Returns:
         None
     """
@@ -280,12 +274,12 @@ Values
 # input folder holds the metadata file
 INPUT_FOLDER = "input"
 # "metadata_16S.xlsx" for full metadata, "metadata_test.xlsx" for simpler metadata testing
-METADATA_FILENAME_XLSX = "metadata_16S.xlsx"
-# Run descriptor (test or full)
-RUN_DESCRIPTOR = "full"
+METADATA_FILENAME_XLSX = "metadata_test.xlsx"
+# Run descriptor ("test" or "full")
+RUN_DESCRIPTOR = "test"
 SAMPLE_ID_COL_NAME = "SampleID"
 
-# downloads folder holds the MG-RAST files downloaded by download_fna_files.py
+# The Downloads folder holds the MG-RAST files downloaded by download_fna_files.py
 DOWNLOADS_FOLDER = "downloads"
 # MG-RAST Accession ID (mgp6248) downloads sub-folder for David et al. (2014) 16S rRNA sequencing data
 MGRAST_ACCESSION_FOLDER = "mgp6248"
@@ -372,7 +366,7 @@ print("Completed importing all .fna files from the metadata as QIIME 2 artifacts
 """
 "Dereplicate Sequences" to Generate a Feature Frequency Table for OTU Clustering per Sample
 """
-# From QIIME2 OTU Clustering Tutorial: https://docs.qiime2.org/2024.10/tutorials/otu-clustering/
+# From QIIME 2 OTU Clustering Tutorial: https://docs.qiime2.org/2024.10/tutorials/otu-clustering/
 # Notes:
 # - After importing the .fna data, you can dereplicate it with the dereplicate-sequences command.
 # - This step is still "per sample" (frequency refers to the number of times a sequence appears in one sample, not across samples).
@@ -422,35 +416,6 @@ if not os.path.exists(merged_feature_sequences_path) or RERUN_EXISTING_DATA:
     merged_feature_sequences_path = merge_feature_sequences(feature_table_output_path, OUTPUT_SCRIPT_FOLDER_DIR, RUN_DESCRIPTOR)
 else:
     print(f"Skipping feature sequences merge, file already exists: {merged_feature_sequences_path}")
-
-
-# """
-# OTU Clustering de novo, per sample basis <-- old version
-# """
-# # Info on picking OTU clustering strategy (de novo vs. closed reference vs. open reference: https://qiime.org/tutorials/otu_picking.html)
-# # If it does not exist, create the output folder for OTU clustering results
-# otu_clustering_output_path = pjoin(OUTPUT_SCRIPT_FOLDER_DIR, "sample_OTU_clustering")
-# if not os.path.exists(otu_clustering_output_path):
-#     os.makedirs(otu_clustering_output_path)
-
-# # Loop over each sample ID in the metadata
-# # Perform de novo clustering using the vsearch plugin in QIIME 2.
-# for index, row in sample_metadata_df.iterrows():
-#     sample_id = row[SAMPLE_ID_COL_NAME]
-
-#     if not RERUN_EXISTING_DATA:
-#         # If artifact file already exists, skip clustering
-#         otu_table_path = pjoin(otu_clustering_output_path, f"{sample_id}-table-cr-0.97.qza")
-#         if os.path.exists(otu_table_path):
-#             print(f"Skipping {sample_id}, OTU clustering already exists: {otu_table_path}")
-#             continue
-
-#     # Cluster the OTUs for the sample
-#     try:
-#         cluster_otus_de_novo_per_sample(feature_table_output_path, sample_id, otu_clustering_output_path)
-#         print(f"Successfully clustered OTUs for {sample_id}.")
-#     except subprocess.CalledProcessError as e:
-#         print(f"Error clustering OTUs for {sample_id}: {e}")
 
 
 """

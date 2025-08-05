@@ -10,7 +10,7 @@
     - Taxonomic Assignment
     - Alpha and Beta Diversity Metrics
 - Main tools:
-    - [QIIME2](https://qiime2.org/)
+    - [QIIME 2](https://qiime2.org/)
     - [MG-RAST API](https://help.mg-rast.org/api.html)
 - The Open Bootcamp Collective [Group Presentation Slides](https://docs.google.com/presentation/d/18d-O28BX4lNezXJkaLLBPzvQ4kP8MUm4zsZS8UC2yn4/edit?usp=sharing) are provided.
 
@@ -20,20 +20,22 @@
     - (1) A plant-based diet with grains, legumes, fruits, vegetables
     - (2) An animal-based diet with meats, eggs, cheeses
 - Each diet was consumed for 5 days, separated by baseline and washout periods.
-- Fecal samples were collected daily, alongside additional data ()
 - For the metagenomic analysis of bacteria in fecal samples, the V4 (high variability) region of 16S rRNA was PCR-amplified. Note that amplicon or targeted metagenomics is distinct from shotgun metagenomics.
+- For metatranscriptomic analysis, RNA was extracted and sequenced (Illulmina HiSeq platform).
+- Additional data not considered here: food logs, dietary questionnaires, and caloric/nutritional quantification, ITS gene sequencing for fungi, qPCR to detect hydrogen consumers, short-chain fatty acid measurements, bile acid measurements, and microbial cultiation from fecal samples.
 
 ## Script Overview for Amplicon Metagenomic Analysis
 1. download_fna_files.py
     - Downloads sequence files using [MG-RAST API](https://help.mg-rast.org/api.html)
 2. cluster_OTUs_from_fna.py
-    - Imports data and metadata for QIIME2 usage
+    - Imports data and metadata for QIIME 2 usage
     - Generates "feature frequency" tables per sample, then merges the tables
     - Performs "de novo" OTU clustering over all samples
 3. generate_metagenomic_statistics.py
     - Classifies taxonomy of OTUs
     - Builds phylogenetic tree
     - Generates diverstiy statistics (in progress)
+    - Relies on the [QIIME 2 viewer](https://view.qiime2.org/) to view .qza/.qzv outputs
 
 - Requirements
     - requests>=2.28.0
